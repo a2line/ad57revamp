@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         AD57 SOURCES
 // @namespace    http://tampermonkey.net/
-// @version      0.2
-// @description  Modifies the register source with link to full quality image.
+// @version      0.4
+// @description  Modifies the register source with link to full quality image and adds multi-page source copying.
 // @author       A2
 // @match        https://num.archives57.com/visualiseur/index.php/docnumViewer/calculHierarchieDocNum/*
 // @grant        none
@@ -16,30 +16,38 @@
     const uniqueIdMatch = currentUrl.match(/\/(\d+:\d+:\d+)\//);
     let localStorageData = null;
     let cheminsArray = [];
-    let formattedSource = '';
     let totalPages = 0;
-    let clipboardMonitorInterval = null;
 
     if (uniqueIdMatch && uniqueIdMatch.length > 1) {
         const uniqueId = uniqueIdMatch[1];
         localStorageData = JSON.parse(localStorage.getItem(uniqueId));
-        if (localStorageData) {
-            console.log('Retrieved data:', localStorageData);
-        } else {
-            console.log("No data found in local storage for", uniqueId);
-        }
     }
 
-    function updateImageUrl(pageNumber) {
-        if (!cheminsArray[pageNumber - 1]) return;
+    function getFullQualityImageUrl(pageNumber, withSize = false) {
+        if (!cheminsArray[pageNumber - 1]) return null;
         const baseUrl = localStorageData.imageSrc.split('@@')[0];
-        const newImageUrl = baseUrl + '@@' + cheminsArray[pageNumber - 1] + '/N/T0/100/100/Y';
-        return newImageUrl;
+        const url = baseUrl + '@@' + cheminsArray[pageNumber - 1];
+        return withSize ? url + '/N/T0/100/100/Y' : url;
     }
 
-    function updateFormattedSource(pageNumber, totalPages, imageUrl) {
-        formattedSource = `${localStorageData.regSrc} i. <a href="${imageUrl}">${pageNumber}</a>/${totalPages}`;
-        return formattedSource;
+    function createMultiPageSource(startPage, pageCount) {
+        const pages = [];
+        const links = [];
+
+        for (let i = 0; i < pageCount; i++) {
+            const pageNum = startPage + i;
+            if (pageNum > totalPages) break;
+
+            const imageUrl = getFullQualityImageUrl(pageNum, true);
+            if (!imageUrl) continue;
+
+            pages.push(pageNum);
+            links.push(`<a href="${imageUrl}">${pageNum}</a>`);
+        }
+
+        if (pages.length === 0) return null;
+
+        return `${localStorageData.regSrc} i. ${links.join('-')}/${totalPages}`;
     }
 
     function copyToClipboard(text) {
@@ -55,47 +63,24 @@
         document.body.removeChild(textarea);
     }
 
-    function handleClipboardContent(text) {
-        const number = parseInt(text);
-        if (!isNaN(number) && number > 0 && number <= totalPages) {
-            const input = document.querySelector('input[type="text"]');
-            if (input) {
-                input.value = number;
-                const inputEvent = new Event('input', { bubbles: true });
-                input.dispatchEvent(inputEvent);
-            }
-        }
-    }
-
-    // Use paste event instead of continuous monitoring
     function setupClipboardListener() {
         document.addEventListener('paste', (e) => {
             const text = e.clipboardData.getData('text');
-            handleClipboardContent(text);
-        });
+            const number = parseInt(text);
+            const input = document.querySelector('input[type="text"]');
 
-        // Only monitor clipboard when document is focused
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden && clipboardMonitorInterval) {
-                clearInterval(clipboardMonitorInterval);
-                clipboardMonitorInterval = null;
-            }
-        });
-
-        // Add focus monitoring
-        window.addEventListener('focus', () => {
-            if (!clipboardMonitorInterval) {
-                navigator.clipboard.readText()
-                    .then(handleClipboardContent)
-                    .catch(() => {}); // Silently handle errors
+            if (!isNaN(number) && number > 0 && number <= totalPages && input) {
+                input.value = number;
+                const inputEvent = new Event('input', { bubbles: true });
+                input.dispatchEvent(inputEvent);
             }
         });
     }
 
     function createInfoBar() {
         const mainInitFunction = Array.from(document.querySelectorAll('script'))
-            .find(script => script.textContent.includes('main({'))
-            .textContent;
+        .find(script => script.textContent.includes('main({'))
+        .textContent;
 
         const docsArray = JSON.parse(mainInitFunction.match(/docs\s*:\s*(\[.*?\])/)[1]);
         cheminsArray = docsArray.map(doc => doc.chemin);
@@ -113,40 +98,61 @@
         infoBar.style.textAlign = 'center';
 
         if (localStorageData) {
-            const initialImageUrl = updateImageUrl(1);
-            formattedSource = updateFormattedSource(1, totalPages, initialImageUrl);
+            const initialImageUrl = getFullQualityImageUrl(1);
+            const fullQualityInitialUrl = initialImageUrl + '/N/T0/100/100/Y';
 
             infoBar.innerHTML = `
                 ${localStorageData.regSrc} i.<input type="text" value="1" style="width: 32px; padding: 0 2px; margin: 0 2px;">/${totalPages}
-                (<a href="${initialImageUrl}" target="_blank" style="color: white; text-decoration: underline;">voir image</a> /
-                <a href="#" style="color: white; text-decoration: underline;" class="copy-btn">copier source</a>)<br>
+                (<a id="view-current" href="${fullQualityInitialUrl}" target="_blank" style="color: white; text-decoration: underline;" title="Visualiser l'image en pleine qualité">voir image</a> /
+                <a id="view-plus-1" href="${getFullQualityImageUrl(2) + '/N/T0/100/100/Y'}" target="_blank" style="color: white; text-decoration: underline;" title="Visualiser l'image suivante en pleine qualité">+1</a> /
+                <a id="view-plus-2" href="${getFullQualityImageUrl(3) + '/N/T0/100/100/Y'}" target="_blank" style="color: white; text-decoration: underline;" title="Visualiser l'image deux positions après celle-ci en pleine qualité">+2</a> |
+                <a id="copy-current" href="#" style="color: white; text-decoration: underline;" class="copy-btn" title="Copier la source dans le presse papier">copier source</a> /
+                <a id="copy-plus-1" href="#" style="color: white; text-decoration: underline;" class="copy-plus-1-btn" title="Copier la source dans le presse papier en incluant l'image suivante">+1</a> /
+                <a id="copy-plus-2" href="#" style="color: white; text-decoration: underline;" class="copy-plus-2-btn" title="Copier la source dans le presse papier en incluant les deux images suivantes">+2</a>)<br>
                 <div style="color: #ccc; font-size: 0.9em;">${localStorageData.descText}</div>
             `;
 
             const input = infoBar.querySelector('input');
-            const imageLink = infoBar.querySelector('a[target="_blank"]');
+            const viewImageLink = infoBar.querySelector('a[target="_blank"]');
+            const viewPlus1Link = viewImageLink.nextElementSibling;
+            const viewPlus2Link = viewPlus1Link.nextElementSibling;
             const copyBtn = infoBar.querySelector('.copy-btn');
+            const copyPlus1Btn = infoBar.querySelector('.copy-plus-1-btn');
+            const copyPlus2Btn = infoBar.querySelector('.copy-plus-2-btn');
 
+            // Update full-quality links dynamically
             input.addEventListener('input', (e) => {
                 const pageNumber = parseInt(e.target.value);
                 if (pageNumber > 0 && pageNumber <= totalPages) {
-                    const newImageUrl = updateImageUrl(pageNumber);
-                    if (newImageUrl) {
-                        imageLink.href = newImageUrl;
-                        formattedSource = updateFormattedSource(pageNumber, totalPages, newImageUrl);
-                    }
+                    viewImageLink.href = getFullQualityImageUrl(pageNumber) + '/N/T0/100/100/Y';
+                    viewPlus1Link.href = getFullQualityImageUrl(pageNumber + 1) + '/N/T0/100/100/Y';
+                    viewPlus2Link.href = getFullQualityImageUrl(pageNumber + 2) + '/N/T0/100/100/Y';
                 }
             });
 
             copyBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                copyToClipboard(formattedSource);
+                const currentPage = parseInt(input.value);
+                const source = createMultiPageSource(currentPage, 1);
+                if (source) copyToClipboard(source);
+            });
+
+            copyPlus1Btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const currentPage = parseInt(input.value);
+                const source = createMultiPageSource(currentPage, 2);
+                if (source) copyToClipboard(source);
+            });
+
+            copyPlus2Btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const currentPage = parseInt(input.value);
+                const source = createMultiPageSource(currentPage, 3);
+                if (source) copyToClipboard(source);
             });
         }
 
         document.body.insertBefore(infoBar, document.body.firstChild);
-
-        // Set up clipboard handling
         setupClipboardListener();
     }
 
