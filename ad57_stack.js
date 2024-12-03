@@ -11,18 +11,40 @@
 // ==/UserScript==
 (function() {
     'use strict';
-    function clearLocalStorageWithPrefix(prefix) {
+
+    // Enhanced localStorage logging function
+    function logLocalStorageEntries(prefix = 'AD57-') {
+        console.log('--- LocalStorage Entries ---');
         for (let i = 0; i < localStorage.length; i++) {
             let key = localStorage.key(i);
             if (key.startsWith(prefix)) {
-                console.log(`Removing key: ${key}`); // Debugging line
+                try {
+                    const value = localStorage.getItem(key);
+                    console.log(`Key: ${key}`);
+                    console.log('Value:', JSON.parse(value));
+                } catch (error) {
+                    console.error(`Error parsing localStorage item for key ${key}:`, error);
+                }
+            }
+        }
+        console.log('--- End of LocalStorage Entries ---');
+    }
+
+    function clearLocalStorageWithPrefix(prefix) {
+        console.log(`Clearing localStorage with prefix: ${prefix}`);
+        for (let i = 0; i < localStorage.length; i++) {
+            let key = localStorage.key(i);
+            if (key.startsWith(prefix)) {
+                console.log(`Removing key: ${key}`);
                 localStorage.removeItem(key);
             }
         }
+        console.log('LocalStorage clearing complete');
     }
-    localStorage.clear();
-    // Usage
+
+    //console.log('All localStorage cleared');
     clearLocalStorageWithPrefix('AD57-');
+
 
 
     if (window.location.href.includes('/1/1/A/')) {
@@ -186,8 +208,21 @@
                         regSrc: regSrc,
                         descText: descText
                     };
-                    if (!localStorage.getItem(uniqueId)) {
-                        localStorage.setItem(uniqueId, JSON.stringify(localStorageData));
+
+                    console.log('Attempting to set localStorage:', {
+                        key: localStorageKey, // Use the new key format
+                        data: localStorageData
+                    });
+
+                    try {
+                        if (!localStorage.getItem(localStorageKey)) {
+                            localStorage.setItem(localStorageKey, JSON.stringify(localStorageData));
+                            console.log(`Successfully set localStorage for key: ${localStorageKey}`);
+                        } else {
+                            console.log(`Key ${localStorageKey} already exists in localStorage`);
+                        }
+                    } catch (error) {
+                        console.error('Error setting localStorage:', error);
                     }
                 }
 
@@ -204,7 +239,11 @@
             }
         });
     }
-
+    // Add a function to log localStorage at the end of processing
+    function finalLocalStorageLog() {
+        console.log('Final LocalStorage State:');
+        logLocalStorageEntries();
+    }
     function copyCurrentPageResults(registersProcessed) {
         const resultatsDiv = document.getElementById('resultat');
         let resultatsCompletsDiv = document.getElementById('resultats_complets');
@@ -235,6 +274,7 @@
         return registersOnThisPage;
     }
 
+    // Modify the existing processPagination function to call finalLocalStorageLog
     function processPagination(registersProcessed = 0) {
         const processedOnThisPage = copyCurrentPageResults(registersProcessed);
         if (!processedOnThisPage) return;
@@ -250,6 +290,7 @@
             });
         } else {
             applyCleanupAndFormatting();
+            finalLocalStorageLog(); // Add this line to log localStorage at the end
         }
     }
 

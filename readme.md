@@ -1,22 +1,30 @@
 # AD57 Archives Revamp
 
 ## Overview
-
 This repository contains two Tampermonkey userscripts designed to enhance the user experience when browsing the Moselle Digital Archives (AD57) website.
+
+Prefer the **[AD57 alphabetic index as root/bookmark to start browsing](https://num.archives57.com/visualiseur/index.php/rechercheTheme/requeteConstructor/1/1/R/A/0)**.
 
 ### Scripts
 The scripts are automatically activated on archive search results pages and registres viewer.
 
 1. **AD57 STACK (`ad57_stack.js`)**:
-   - Consolidates registers results by commune across multiple pages
+   - Consolidates registers results by commune across multiple pages into a single clean list
+   - Improves readability by removing redundant information and cleaning up the layout
    - Generate a comprehensive and cleaner list of registers
-   - Standardizes all official names of commune (no more fullcaps)
+   - Standardizes commune names with proper capitalization and accents
+   - Automatically stores the metadata of sources in localStorage for use by AD57 SOURCES
 
-2. **AD57 SOURCES (`ad57_sources.js`)**: 
+2. **AD57 SOURCES** (`ad57_sources.js`):
    - Enhances document viewer with a top information source bar
-     * Current document detailed source
-     * Link to direct image in full resolution
-     * Easy source copying button
+     * Current document detailed source with page number and total
+     * Direct links to full resolution images (current, +1, +2 pages)
+     * Multiple source copying options:
+       - Single page source
+       - Source including next page (+1)
+       - Source including next two pages (+2)
+     * Optional checkbox to copy sources without hyperlinks
+     * Smart hiding of unavailable options near document end
 
 ## Installation
 
@@ -34,7 +42,6 @@ The scripts are automatically activated on archive search results pages and regi
 `https://raw.githubusercontent.com/a2line/ad57revamp/master/ad57_sources.js`
 
 ### Install Scripts
-
 #### Method 1: Direct URL Installation
 (In TamperMonkey Legacy)
 1. Open Tampermonkey Dashboard
@@ -47,13 +54,6 @@ The scripts are automatically activated on archive search results pages and regi
 2. Click the "+" tab
 3. Copy-paste the entire script content
 4. Save the script
-
-## Usage
-Prefer using the **[AD57 alphabetic index as root/bookmark to start browsing](https://num.archives57.com/visualiseur/index.php/rechercheTheme/requeteConstructor/1/1/R/A/0)**.
-
-Then there is nothing to be done, except on registers you can copy the page number at the bottom, then then paste it anywhere
-to have it copied on the source input at the top so the image link and sources copy button will show the good image.
-(Note that the script is currently unable to catch that number automatically!)
 
 ## Notes
 - Obviously only working on the Archives départementales de la Moselle (AD57) website.
